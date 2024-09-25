@@ -19,6 +19,7 @@
 #include "angband.h"
 #include "cmds.h"
 #include "effects.h"
+#include <time.h>
 #include "game-world.h"
 #include "generate.h"
 #include "init.h"
@@ -38,14 +39,16 @@
 #include "target.h"
 #include "trap.h"
 #include "z-queue.h"
-
 uint16_t daycount = 0;
 uint32_t seed_randart;		/* Hack -- consistent random artifacts */
 uint32_t seed_flavor;		/* Hack -- consistent object colors */
 int32_t turn;			/* Current game turn */
 bool character_generated;	/* The character exists */
 bool character_dungeon;		/* The character has a dungeon */
+static time_t playtime_start = 0;  // To track start time
+static time_t playtime_total = 0;  // Total playtime
 struct level *world;
+
 
 /**
  * This table allows quick conversion from "speed" to "energy"
@@ -89,6 +92,9 @@ const uint8_t extract_energy[200] =
 	/* Fast */    49, 49, 49, 49, 49, 49, 49, 49, 49, 49,
 };
 
+time_t get_total_playtime(void) {
+    return playtime_total + (time(NULL) - playtime_start);
+}
 /**
  * Find a level by its name
  */
@@ -930,6 +936,11 @@ void process_player(void)
 	player_resting_complete_special(player);
 	event_signal(EVENT_CHECK_INTERRUPT);
 
+	if (character_generated && !player->is_dead) {
+        playtime_total += time(NULL) - playtime_start;
+        playtime_start = time(NULL);
+    }
+
 	/* Repeat until energy is reduced */
 	do {
 		/* Refresh */
@@ -995,6 +1006,10 @@ void process_player(void)
  */
 void on_new_level(void)
 {
+	if (player->is_new_character) {
+        playtime_start = time(NULL);
+        playtime_total = 0;
+    }
 	/* Arena levels are not really a level change */
 	if (!player->upkeep->arena_level) {
 		/* Play ambient sound on change of level. */
